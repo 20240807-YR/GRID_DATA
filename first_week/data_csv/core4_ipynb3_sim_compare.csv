@@ -1,0 +1,3 @@
+scenario,peak_exceed,avg_ramp,risky_ramp
+Reactive (actual trigger),438,232.45007099794472,438
+Proactive (model trigger),496,233.2841299315925,438
