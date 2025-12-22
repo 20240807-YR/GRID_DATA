@@ -272,90 +272,85 @@
    * amiwea.csv 파일을 로드하고 timestamp를 index로 설정한 후 XGB테스트.csv 파일을 로드하고 timestamp를 index로 설정했습니다.
    * 예측값(pred_xgb)을 df["pred"]로 병합한 뒤 결측을 제거했습니다.
    * 공통 평가 지표 정의
-	•	evaluate_metrics(load_series, peak_threshold, ramp_threshold) 함수를 정의했습니다.
-	•	부하 변화량 ramp = diff().abs()를 계산했습니다.
-	•	지표로 다음 값을 반환했습니다.
-	•	peak_exceed
-	•	avg_ramp
-	•	risky_ramp (고정 ramp_threshold 초과)
+        * evaluate_metrics(load_series, peak_threshold, ramp_threshold) 함수를 정의했습니다.
+        * 부하 변화량 ramp = diff().abs()를 계산했습니다.
+        * 지표로 다음 값을 반환했습니다.
+             * peak_exceed
+             * avg_ramp
+             * risky_ramp (고정 ramp_threshold 초과)
    * Baseline 지표 산출
-	•	피크 임계치를 consumption 상위 10% 기준(quantile(0.90))으로 완화했습니다.
-	•	baseline ramp 기준은 consumption의 ramp 상위 5%로 설정했습니다.
-	•	baseline 지표를 계산해 baseline_metrics로 저장했습니다.
+        * 피크 임계치를 consumption 상위 10% 기준(quantile(0.90))으로 완화했습니다.
+        * baseline ramp 기준은 consumption의 ramp 상위 5%로 설정했습니다.
+        * baseline 지표를 계산해 baseline_metrics로 저장했습니다.
    * ESS 파라미터 공간 정의
-	•	ESS_POWER_RANGE = [2, 4, 6, 8]
-	•	ESS_ENERGY_RANGE = [5, 10, 20]
-	•	SOC_INIT = 0.5
-	•	ALPHA = 0.1
+        * ESS_POWER_RANGE = [2, 4, 6, 8]
+        * ESS_ENERGY_RANGE = [5, 10, 20]
+        * SOC_INIT = 0.5
+        * ALPHA = 0.1
    * 규칙 변경된 ESS 제어 시뮬레이션 구현
-	•	simulate_ess_predictive(load, pred, power_max, energy_max) 함수를 정의했습니다.
-	•	개입 조건을 다음과 같이 변경했습니다.
-	•	pred > 0.9 * peak_threshold 이고 soc > 0인 경우 개입
-	•	방전량은 min(power_max, ALPHA * pred, soc)로 제한했습니다.
-	•	부하에서 방전량을 차감하고 SOC를 감소시켰습니다.
+        * simulate_ess_predictive(load, pred, power_max, energy_max) 함수를 정의했습니다.
+        * 개입 조건을 다음과 같이 변경했습니다.
+             * pred > 0.9 * peak_threshold 이고 soc > 0인 경우 개입
+        * 방전량은 min(power_max, ALPHA * pred, soc)로 제한했습니다.
+        * 부하에서 방전량을 차감하고 SOC를 감소시켰습니다.
    * 파라미터 Sweep 실행 및 결과 정리
-	•	모든 (power_max, energy_max) 조합에 대해 부하 보정을 수행했습니다.
-	•	각 시나리오별 지표를 계산해 result_df로 정리했습니다.
+        * 모든 (power_max, energy_max) 조합에 대해 부하 보정을 수행했습니다.
+        * 각 시나리오별 지표를 계산해 result_df로 정리했습니다.
    * Trade-off 시각화
-	•	에너지 용량별로 power_max 대비 피크 초과 횟수를 선 그래프로 시각화했습니다.
-	•	peak_exceed와 risky_ramp의 trade-off 산점도를 생성했고, 색상은 power_max로 표시했습니다.
+        * 에너지 용량별로 power_max 대비 피크 초과 횟수를 선 그래프로 시각화했습니다.
+        * peak_exceed와 risky_ramp의 trade-off 산점도를 생성했고, 색상은 power_max로 표시했습니다.
 
-⸻
+* **pred 기준 평가 구조 재정의** (12_19_ess파라미터sweep&trade-off분석.ipynb)
+   * XGB테스트.csv 파일을 로드하고 timestamp를 index로 설정했습니다.
+   * 평가용 데이터프레임을 pred_xgb → pred로 컬럼명을 변경해 df_eval로 생성했습니다.
+   * 데이터가 정상 생성됐는지 head()와 shape로 확인했습니다.
+   * 공통 지표 함수 정의
+        * evaluate_metrics(load_series, threshold, ramp_threshold_fixed=None) 함수를 정의했습니다.
+        * ramp를 diff().abs()로 계산했습니다.
+        * ramp 임계치가 입력되지 않으면 상위 5%로 자동 계산하도록 했습니다.
+        * 반환값에 ramp_threshold도 포함하도록 구성했습니다.
+   * Baseline에서 ramp 기준 고정
+        * 피크 임계치는 actual 상위 5% 분위수로 정의했습니다.
+        * baseline 부하는 actual 그대로 사용했습니다.
+        * baseline 지표를 계산해 ramp 임계치(ramp_threshold_fixed)를 고정했습니다.
+   * ESS 파라미터 정의 및 Sweep 실행
+        * ESS_POWER_RANGE = [2, 4, 6, 8]
+        * ESS_ENERGY_RANGE = [5, 10, 20]
+        * SOC_INIT = 0.5
+        * ALPHA = 0.10
+        * 예측값이 임계치(threshold)를 초과하고 SOC가 남아 있으면 방전하도록 설정했습니다.
+        * 방전량은 min(power_max, alpha * actual, soc)로 제한했습니다.
+        * 모든 조합에 대해 결과를 계산하고 result_df로 정리했습니다.
+   * Trade-off 시각화
+        * 에너지 용량별로 power_max 대비 피크 초과 횟수를 선 그래프로 시각화했습니다.
+        * peak_exceed와 risky_ramp의 trade-off 산점도를 생성했고, 색상은 power_max로 표시했습니다.
 
-📅 12월 19일: pred 기준 평가용 데이터셋으로 ESS Sweep 재구성
-	•	pred 기준 평가 구조 재정의 (12_19_ess파라미터sweep&trade-off분석.ipynb)
-	•	XGB테스트.csv 파일을 로드하고 timestamp를 index로 설정했습니다.
-	•	평가용 데이터프레임을 pred_xgb → pred로 컬럼명을 변경해 df_eval로 생성했습니다.
-	•	데이터가 정상 생성됐는지 head()와 shape로 확인했습니다.
-	•	공통 지표 함수 정의
-	•	evaluate_metrics(load_series, threshold, ramp_threshold_fixed=None) 함수를 정의했습니다.
-	•	ramp를 diff().abs()로 계산했습니다.
-	•	ramp 임계치가 입력되지 않으면 상위 5%로 자동 계산하도록 했습니다.
-	•	반환값에 ramp_threshold도 포함하도록 구성했습니다.
-	•	Baseline에서 ramp 기준 고정
-	•	피크 임계치는 actual 상위 5% 분위수로 정의했습니다.
-	•	baseline 부하는 actual 그대로 사용했습니다.
-	•	baseline 지표를 계산해 ramp 임계치(ramp_threshold_fixed)를 고정했습니다.
-	•	ESS 파라미터 정의 및 Sweep 실행
-	•	ESS_POWER_RANGE = [2, 4, 6, 8]
-	•	ESS_ENERGY_RANGE = [5, 10, 20]
-	•	SOC_INIT = 0.5
-	•	ALPHA = 0.10
-	•	예측값이 임계치(threshold)를 초과하고 SOC가 남아 있으면 방전하도록 설정했습니다.
-	•	방전량은 min(power_max, alpha * actual, soc)로 제한했습니다.
-	•	모든 조합에 대해 결과를 계산하고 result_df로 정리했습니다.
-	•	Trade-off 시각화
-	•	에너지 용량별로 power_max 대비 피크 초과 횟수를 선 그래프로 시각화했습니다.
-	•	peak_exceed와 risky_ramp의 trade-off 산점도를 생성했고, 색상은 power_max로 표시했습니다.
-
-⸻
-
-📅 12월 20일: Ramp 기반 ESS 개입 시뮬레이션
-	•	Ramp 기반 주파수 안정 proxy 정의 및 ESS 개입 실험 (12_20_ramp기반_ESS개입시뮬레이션.ipynb)
-	•	XGB테스트.csv 파일을 로드하고 timestamp를 index로 설정했습니다.
-	•	pred_xgb 컬럼을 pred로 변경했습니다.
-	•	데이터가 정상 생성됐는지 head()와 shape로 확인했습니다.
-	•	Ramp 기준 정의
-	•	actual의 ramp를 diff().abs()로 계산해 df["ramp"]로 생성했습니다.
-	•	baseline ramp 기준을 상위 5% 분위수(quantile(0.95))로 설정했습니다.
-	•	공통 평가 지표 함수 정의
-	•	evaluate_metrics(load_series, ramp_threshold) 함수를 정의했습니다.
-	•	평균 ramp(avg_ramp)와 위험 ramp 발생 횟수(risky_ramp)를 계산했습니다.
-	•	ESS 파라미터 공간 정의
-	•	ESS_POWER_RANGE = [2, 4, 6, 8]
-	•	ESS_ENERGY_RANGE = [5, 10, 20]
-	•	SOC_INIT = 0.5
-	•	Ramp 기반 ESS 개입 로직 구현
-	•	simulate_ess_ramp_based(load, ramp, power_max, energy_max) 함수를 정의했습니다.
-	•	예측값은 사용하지 않고, ramp가 임계치를 초과하는 경우 즉각 개입하도록 설정했습니다.
-	•	방전량은 min(power_max, soc)로 제한했습니다.
-	•	부하에서 방전량을 차감하고 SOC를 감소시켰습니다.
-	•	Baseline 지표 계산
-	•	baseline은 actual 그대로 두고 평균 ramp 및 위험 ramp 발생 횟수를 계산했습니다.
-	•	파라미터 Sweep 실행 및 결과 정리
-	•	모든 (power_max, energy_max) 조합에 대해 ramp 기반 ESS 개입 시뮬레이션을 수행했습니다.
-	•	각 시나리오별 지표를 계산해 result_df로 정리했습니다.
-	•	baseline 포함 비교 테이블(summary)을 생성했습니다.
-	•	시각화 — ESS Power vs Risky Ramp
-	•	에너지 용량별로 power_max 대비 위험 ramp 발생 횟수를 선 그래프로 시각화했습니다.
-	•	baseline 위험 ramp 값을 점선으로 함께 표시했습니다.
+### 📅 12월 20일: Ramp 기반 ESS 개입 시뮬레이션
+* **Ramp 기반 주파수 안정 proxy 정의 및 ESS 개입 실험** (12_20_ramp기반_ESS개입시뮬레이션.ipynb)
+   * XGB테스트.csv 파일을 로드하고 timestamp를 index로 설정했습니다.
+   * pred_xgb 컬럼을 pred로 변경했습니다.
+   * 데이터가 정상 생성됐는지 head()와 shape로 확인했습니다.
+   * Ramp 기준 정의
+        * actual의 ramp를 diff().abs()로 계산해 df["ramp"]로 생성했습니다.
+        * baseline ramp 기준을 상위 5% 분위수(quantile(0.95))로 설정했습니다.
+   * 공통 평가 지표 함수 정의
+        * evaluate_metrics(load_series, ramp_threshold) 함수를 정의했습니다.
+        * 평균 ramp(avg_ramp)와 위험 ramp 발생 횟수(risky_ramp)를 계산했습니다.
+   * ESS 파라미터 공간 정의
+        * ESS_POWER_RANGE = [2, 4, 6, 8]
+        * ESS_ENERGY_RANGE = [5, 10, 20]
+        * SOC_INIT = 0.5
+   * Ramp 기반 ESS 개입 로직 구현
+        * simulate_ess_ramp_based(load, ramp, power_max, energy_max) 함수를 정의했습니다.
+        * 예측값은 사용하지 않고, ramp가 임계치를 초과하는 경우 즉각 개입하도록 설정했습니다.
+        * 방전량은 min(power_max, soc)로 제한했습니다.
+        * 부하에서 방전량을 차감하고 SOC를 감소시켰습니다.
+   * Baseline 지표 계산
+	        * baseline은 actual 그대로 두고 평균 ramp 및 위험 ramp 발생 횟수를 계산했습니다.
+   * 파라미터 Sweep 실행 및 결과 정리
+        * 모든 (power_max, energy_max) 조합에 대해 ramp 기반 ESS 개입 시뮬레이션을 수행했습니다.
+        * 각 시나리오별 지표를 계산해 result_df로 정리했습니다.
+        * baseline 포함 비교 테이블(summary)을 생성했습니다.
+   * 시각화 — ESS Power vs Risky Ramp
+        * 에너지 용량별로 power_max 대비 위험 ramp 발생 횟수를 선 그래프로 시각화했습니다.
+        * baseline 위험 ramp 값을 점선으로 함께 표시했습니다.
